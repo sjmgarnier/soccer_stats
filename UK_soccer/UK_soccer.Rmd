@@ -1,0 +1,103 @@
+---
+title: "UK soccer statistics"
+author: "Simon Garnier"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    css: custom.css
+    fig_caption: true
+    fig_width: 8
+    fig_height: 6
+    number_sections: true
+    theme: cosmo
+    toc: true
+---
+
+--- 
+
+# Setup environment
+
+```{r, 'setup', message=FALSE}
+library(engsoccerdata)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(viridis)
+library(graphZoo)
+```
+
+[Back to top]("#")
+
+---
+
+# Number of goals per game
+
+## Division 1 (1888-2014)
+
+```{r, 'figure_1', cache=FALSE, dpi=300, warning=FALSE}
+dat <- filter(engsoccerdata2, division == 1) %>%
+  group_by(Season) %>%
+  summarize(totgoal = mean(totgoal))
+
+dat <- rbind(dat, data.frame(Season = c(1915:1918, 1940:1945), totgoal = NA))
+
+g <- ggplot(dat, aes(x = Season, y = totgoal)) + 
+  annotate("rect", xmin = 1914.5, xmax = 1918.5, ymin = 2.25, ymax = 4.75, alpha = 0.3) +
+  annotate("rect", xmin = 1939.5, xmax = 1945.5, ymin = 2.25, ymax = 4.75, alpha = 0.3) +
+  annotate("text", x = 1916.5, y = 2.25, angle = 90, label = " World War I", size = 4, hjust = 0, alpha = 0.5) + 
+  annotate("text", x = 1942.5, y = 2.25, angle = 90, label = " World War II", size = 4, hjust = 0, alpha = 0.5) + 
+  geom_line(color = viridis(3)[2], alpha = 0.25) +
+  geom_point(size = 3, color = viridis(3)[2]) + 
+  scale_x_continuous(breaks = seq(1900, 2014, 20)) +
+  scale_y_continuous(breaks = seq(0, 5, 0.5)) +
+  theme_graphzoo(base_size = 16) + theme(axis.title = element_blank())
+
+gz_graph(g, title = "Average number of goals per game", subtitle = "English Soccer Division 1 (1888-2014)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+
+```
+<p class="caption">**Figure 1:** Figure caption.</p>
+
+[Back to top]("#")
+
+---
+
+# Home result probability
+
+## Division 1 (1888-2014)
+
+```{r, 'figure_2', cache=FALSE, dpi=300}
+doProp <- function(x) {
+  tab <- table(x)
+  data.frame(result = names(tab), prop = as.vector(tab / sum(tab)))
+}
+
+dat <- filter(engsoccerdata2, division == 1) %>%
+  group_by(Season) %>%
+  do(doProp(.$result))
+
+g <- ggplot(dat, aes(x = Season, y = prop, alpha = result)) + 
+  geom_bar(stat="identity", width = 1, fill = viridis(3)[2]) + 
+  annotate("rect", xmin = 1914.5, xmax = 1918.5, ymin = 0, ymax = 1, alpha = 0.3) +
+  annotate("rect", xmin = 1939.5, xmax = 1945.5, ymin = 0, ymax = 1, alpha = 0.3) +
+  annotate("text", x = 1916.5, y = 0, angle = 90, label = " World War I", size = 4, hjust = 0, alpha = 0.5) + 
+  annotate("text", x = 1942.5, y = 0, angle = 90, label = " World War II", size = 4, hjust = 0, alpha = 0.5) + 
+  annotate("text", x = 2010, y = c(0.125, 0.39, 0.75), hjust = 1,
+           label = c("Away team wins", "Draw", "Home team wins")) + 
+  scale_fill_viridis(discrete = TRUE) + 
+  guides(alpha = FALSE) +
+  scale_x_continuous(breaks = seq(1900, 2014, 20)) +
+  scale_y_continuous(labels = percent) +
+  theme_graphzoo(base_size = 16) + theme(axis.title = element_blank())
+
+gz_graph(g, title = "Average game outcome", subtitle = "English Soccer Division 1 (1888-2014)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+
+```
+<p class="caption">**Figure 2:** Figure caption.</p>
+
+[Back to top]("#")
+
+---
