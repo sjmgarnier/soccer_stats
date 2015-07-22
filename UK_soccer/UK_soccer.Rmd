@@ -21,6 +21,7 @@ output:
 library(engsoccerdata)
 library(dplyr)
 library(ggplot2)
+library(directlabels)
 library(scales)
 library(viridis)
 library(graphZoo)
@@ -55,7 +56,6 @@ g <- ggplot(dat, aes(x = Season, y = totgoal)) +
 gz_graph(g, title = "Average number of goals per game", subtitle = "English Soccer Division 1 (1888-2014)",
          banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
          cex.title = 1.5, cex.banner = 0.7)
-
 ```
 <p class="caption">**Figure 1:** Figure caption.</p>
 
@@ -94,9 +94,97 @@ g <- ggplot(dat, aes(x = Season, y = prop, alpha = result)) +
 gz_graph(g, title = "Average game outcome", subtitle = "English Soccer Division 1 (1888-2014)",
          banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
          cex.title = 1.5, cex.banner = 0.7)
-
 ```
 <p class="caption">**Figure 2:** Figure caption.</p>
+
+[Back to top]("#")
+
+---
+
+# Most victories
+
+## Division 1 (1888-2014)
+
+### Overall
+
+```{r, 'figure_3a', cache=FALSE, dpi=300, fig.height=8, fig.width=6}
+dat <- filter(engsoccerdata2, result != "D", division == 1) %>%
+  mutate(victor = ifelse(result == "H", home, visitor)) 
+
+overall <- group_by(dat, victor) %>%
+  summarize(count = length(victor)) %>%
+  arrange(desc(count))
+
+g <- ggplot(overall, aes(x = reorder(factor(victor), count), y = count, alpha = count)) +
+  geom_bar(stat = "identity", fill = viridis(3)[2], width = 1) + 
+  coord_flip() + guides(alpha = FALSE) +
+  theme_graphzoo(base_size = 10) + theme(axis.title = element_blank())
+
+gz_graph(g, title = "Total number of victories", subtitle = "English Soccer Division 1 (1888-2014)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+```
+<p class="caption">**Figure 3a:** Figure caption.</p>
+
+```{r, 'figure_3b', cache=FALSE, dpi=300, warning=FALSE}
+cumulated <- mutate(dat, win = 1) %>%
+  group_by(victor) %>%
+  mutate(cum.win = order_by(Date, cumsum(win))) %>%
+  filter(victor %in% unique(victor[Season == 2014]))
+
+wwi <- c(as.Date(max(filter(cumulated, Season == 1914)$Date)), 
+         as.Date(min(filter(cumulated, Season == 1919)$Date)))
+wwii <- c(as.Date(max(filter(cumulated, Season == 1939)$Date)),
+          as.Date(min(filter(cumulated, Season == 1946)$Date)))
+
+teams <- group_by(cumulated, victor) %>%
+  summarize(sum = max(cum.win))
+
+toOptim <- function(par, orig, min.dist = 10, w = c(1, 1)) {
+  v1 <- par - orig
+  
+  l <- length(par)
+  m <- matrix(par, nrow = l, ncol = l)
+  n <- matrix(par, nrow = l, ncol = l, byrow = TRUE)
+  d <- n - m
+  diag(d) <- NA
+  d[abs(d) > min.dist] <- NA
+  v2 <- apply(d - min.dist * sign(d), 2, sum, na.rm = TRUE)
+  
+  if (identical(order(orig), order(par))) {
+    sum(abs(w[1] * v1 + w[2] * v2))
+  } else {
+    Inf
+  }
+}
+
+lab.pos <- nlm(toOptim, teams$sum, orig = teams$sum, min.dist = 60, w = c(1, 5))$estimate
+
+g <- ggplot(cumulated, aes(x = as.Date(Date), y = cum.win, color = victor)) +
+  geom_line(size = 1) + 
+  scale_x_date(limits = c(min(as.Date(cumulated$Date)), as.Date("2037-01-01")),
+               breaks = as.Date(paste0(seq(1900, 2000, 20), "-01-01")),
+               labels = seq(1900, 2000, 20)) + 
+  annotate("text", x = as.Date("2016-01-01"), y = lab.pos, 
+           label = teams$victor, hjust = 0, size = 3) + 
+  annotate("rect", xmin = wwi[1], xmax = wwi[2], ymin = 0, ymax = Inf, fill = "#bebebe") +
+  annotate("rect", xmin = wwii[1], xmax = wwii[2], ymin = 0, ymax = Inf, fill = "#bebebe") +
+  annotate("text", x = wwi[1] + difftime(wwi[2], wwi[1]) / 2, y = 0, 
+           angle = 90, label = " World War I", size = 4, hjust = 0, alpha = 0.5) + 
+  annotate("text", x = wwii[1] + difftime(wwii[2], wwii[1]) / 2, y = 0, 
+           angle = 90, label = " World War II", size = 4, hjust = 0, alpha = 0.5) + 
+  scale_color_viridis(discrete = TRUE) + guides(color = FALSE) + 
+  theme_graphzoo(base_size = 16) + theme(axis.title = element_blank())
+
+gz_graph(g, title = "Cumulative number of victories (2014 teams)", subtitle = "English Soccer Division 1 (1888-2014)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+```
+<p class="caption">**Figure 3b:** Figure caption.</p>
+
+### Home victories
+
+### Away victories
 
 [Back to top]("#")
 
