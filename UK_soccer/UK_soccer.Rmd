@@ -25,6 +25,11 @@ library(directlabels)
 library(scales)
 library(viridis)
 library(graphZoo)
+
+doProp <- function(x) {
+  tab <- table(x)
+  data.frame(result = names(tab), prop = as.vector(tab / sum(tab)), n = sum(tab))
+}
 ```
 
 [Back to top]("#")
@@ -68,11 +73,6 @@ gz_graph(g, title = "Average number of goals per game", subtitle = "English Socc
 ## Division 1 (1888-2014)
 
 ```{r, 'figure_2', cache=FALSE, dpi=300}
-doProp <- function(x) {
-  tab <- table(x)
-  data.frame(result = names(tab), prop = as.vector(tab / sum(tab)))
-}
-
 dat <- filter(engsoccerdata2, division == 1) %>%
   group_by(Season) %>%
   do(doProp(.$result))
@@ -103,7 +103,7 @@ gz_graph(g, title = "Average game outcome", subtitle = "English Soccer Division 
 
 # Most victories
 
-## Division 1 (1888-2014)
+## 2014 division 1 teams (1888-2014)
 
 ### Overall
 
@@ -189,3 +189,50 @@ gz_graph(g, title = "Cumulative number of victories (2014 teams)", subtitle = "E
 [Back to top]("#")
 
 ---
+
+# Match frequency between two teams
+
+## 2014 division 1 teams (1888-2014)
+
+### Number of games played
+
+```{r, 'figure_4', cache=FALSE, dpi=300, warning=FALSE, fig.height=8}
+d1.teams.2014 <- filter(engsoccerdata2, division == 1, Season == 2014) %>%
+  .$home %>% unique() %>% sort()
+
+tmp <- lapply(d1.teams.2014, 
+              function(team, df, f) {
+                all <- opponentfreq(df, team)
+                filt <- filter(all, team %in% f)
+                data.frame(team = team, opponent = filt$team, count = filt$n)
+              }, df = engsoccerdata2, f = d1.teams.2014)
+
+oppositions <- Reduce(function(...) merge(..., all=T), tmp) %>%
+  mutate(opponent = factor(opponent, levels = rev(d1.teams.2014))) %>%
+  group_by(team) %>%
+  mutate(percent = count / sum(count, na.rm = TRUE))
+
+oppositions <- merge(oppositions, data.frame(team = d1.teams.2014, opponent = d1.teams.2014), all = TRUE)
+
+g <- ggplot(oppositions, aes(x = team, y = opponent, fill = count)) +
+  geom_tile(height = 0.75) +
+  scale_fill_viridis(name = "", limits = c(0, NA), na.value = "#F0F0F0") + 
+  theme_graphzoo(base_size = 12) + 
+  theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(),
+        legend.key.height = unit(0.5, "inches"))
+
+gz_graph(g, title = "Number of games played by... against...", subtitle = "English Soccer Division 1 (1888-2014)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+```
+<p class="caption">**Figure 4:** Figure caption.</p>
+
+[Back to top]("#")
+
+---
+
+
+
+
+

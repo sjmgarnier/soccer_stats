@@ -1,0 +1,113 @@
+---
+title: "Premier League 2015"
+author: "Simon Garnier"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    css: custom.css
+    fig_caption: true
+    fig_width: 8
+    fig_height: 6
+    number_sections: true
+    theme: cosmo
+    toc: true
+    csl: plos.csl
+    bibliography: library.bib
+---
+
+--- 
+
+# Setup environment
+
+```{r, 'setup', message=FALSE}
+library(engsoccerdata)
+library(dplyr)
+library(ggplot2)
+library(directlabels)
+library(scales)
+library(viridis)
+library(png)
+library(graphZoo)
+
+doProp <- function(x) {
+  tab <- table(x)
+  data.frame(result = names(tab), prop = as.vector(tab / sum(tab)), n = sum(tab))
+}
+```
+
+[Back to top]("#")
+
+---
+
+# Compute pairwise statistics 
+
+```{r, 'statistics', cache=TRUE}
+teams <- read.csv("../data/PL_2015_logos.csv")
+
+tmp <- lapply(teams$team, 
+              function(team, df) {
+                filt <- filter(df, home == team | visitor == team) %>%
+                  mutate(opponent = ifelse(home == team, visitor, home)) %>%
+                  mutate(result = ifelse(result == "D", "draw", result)) %>%
+                  mutate(result = ifelse(home == team & result == "H", "win", result)) %>%
+                  mutate(result = ifelse(home == team & result == "A", "loss", result)) %>%
+                  mutate(result = ifelse(visitor == team & result == "A", "win", result)) %>%
+                  mutate(result = ifelse(visitor == team & result == "H", "loss", result))
+                data.frame(team = team, opponent = filt$opponent, result = filt$result)
+              }, df = engsoccerdata2)
+
+stats <- Reduce(function(...) merge(..., all=T), tmp) %>%
+  filter(opponent %in% teams$team) %>%
+  droplevels() %>%
+  group_by(team, opponent) %>% 
+  do(doProp(.$result)) %>%
+  mutate(result = factor(result, levels = c("win", "draw", "loss"))) %>%
+  ungroup()
+```
+
+[Back to top]("#")
+
+---
+
+# Win proportion
+
+```{r, 'figure_1', cache=FALSE, warning=FALSE, dpi=300, fig.height=7}
+for (i in 1:nrow(teams)) {
+  filt <- teams$team[i]
+  df <- filter(stats, team == filt, result == "win") 
+  
+  if (nrow(df) < 19) {
+    tmp <- data.frame(team = filt, 
+                      opponent = teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
+                      result = "win", prop = NA, n = 0)
+    df <- merge(df, tmp, all = TRUE)
+  }
+  
+  df <- mutate(df, opponent = factor(opponent, levels = opponent[order(-prop, na.last = TRUE)]))
+  
+  g <- ggplot(df, aes(x = opponent, y = prop, fill = result)) + 
+    geom_bar(stat = "identity", width = 0.75, fill = teams$color[i], alpha = 0.75) + 
+    geom_text(aes(label = paste0("n=", n, " ")), angle = 90, hjust = 1, size = 3, color = "white") + 
+    theme_graphzoo(base_size = 12) + guides(fill = FALSE) + 
+    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  img <- readPNG(paste0("../img/", teams$logo[i], ".png"))
+  img <- rasterGrob(img, interpolate=TRUE)
+
+  g <- g + annotation_custom(img, 
+                             xmin = 16, xmax = Inf, 
+                             ymin = max(0.75 * df$prop, na.rm = TRUE), ymax = Inf)
+
+  gz_graph(g, title = paste0("Proportion of matches won by ", filt, " against..."), 
+           subtitle = "2015 Premier League teams only. Period covered: 1888-2014",
+           banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
+           cex.title = 1.25, cex.banner = 0.7)
+  
+  grid.newpage()
+}
+```
+<p class="caption">**Figure 5:** Figure caption.</p>
+
+[Back to top]("#")
+
+---
