@@ -51,7 +51,7 @@ gz_graph(g, title="Total number of victories (top 20)", subtitle="English top-fl
          cex.title=1.5, cex.banner=0.7)
 ```
 
-Now, the question for all Liverpool fans is: will it last, and for how long? Liverpool has not won a top-flight championship since 1990, and in the meantime a number of teams has started catching up with the Red Devils, both in the number of titles won ([Manchester United](http://www.manutd.com) is actually ahead of Liverpool since 2011) and in the total number of wins. 
+Now, the question for all Liverpool fans is: will it last, and for how long? Liverpool has not won a top-flight championship since 1990, and in the meantime a number of teams has started catching up with the Reds, both in the number of titles won ([Manchester United](http://www.manutd.com) is actually ahead of Liverpool since 2011) and in the total number of wins. 
 
 **How much more time before Liverpool fans are forced to stop looking down on the rest of us?**
 
