@@ -31,7 +31,7 @@ library(graphZoo)
 
 doProp <- function(x) {
   tab <- table(x)
-  data.frame(result = names(tab), prop = as.vector(tab / sum(tab)), n = sum(tab))
+  data.frame(result=names(tab), prop=as.vector(tab / sum(tab)), n=sum(tab))
 }
 ```
 
@@ -47,21 +47,21 @@ teams <- read.csv("../data/PL_2015_logos.csv")
 tmp <- lapply(teams$team, 
               function(team, df) {
                 filt <- filter(df, home == team | visitor == team) %>%
-                  mutate(opponent = ifelse(home == team, visitor, home)) %>%
-                  mutate(result = ifelse(result == "D", "draw", result)) %>%
-                  mutate(result = ifelse(home == team & result == "H", "win", result)) %>%
-                  mutate(result = ifelse(home == team & result == "A", "loss", result)) %>%
-                  mutate(result = ifelse(visitor == team & result == "A", "win", result)) %>%
-                  mutate(result = ifelse(visitor == team & result == "H", "loss", result))
-                data.frame(team = team, opponent = filt$opponent, result = filt$result)
-              }, df = engsoccerdata2)
+                  mutate(opponent=ifelse(home == team, visitor, home)) %>%
+                  mutate(result=ifelse(result == "D", "draw", result)) %>%
+                  mutate(result=ifelse(home == team & result == "H", "win", result)) %>%
+                  mutate(result=ifelse(home == team & result == "A", "loss", result)) %>%
+                  mutate(result=ifelse(visitor == team & result == "A", "win", result)) %>%
+                  mutate(result=ifelse(visitor == team & result == "H", "loss", result))
+                data.frame(team=team, opponent=filt$opponent, result=filt$result)
+              }, df=engsoccerdata2)
 
 stats <- Reduce(function(...) merge(..., all=T), tmp) %>%
   filter(opponent %in% teams$team) %>%
   droplevels() %>%
   group_by(team, opponent) %>% 
   do(doProp(.$result)) %>%
-  mutate(result = factor(result, levels = c("win", "draw", "loss"))) %>%
+  mutate(result=factor(result, levels=c("win", "draw", "loss"))) %>%
   ungroup()
 ```
 
@@ -77,31 +77,31 @@ for (i in 1:nrow(teams)) {
   df <- filter(stats, team == filt, result == "win") 
   
   if (nrow(df) < 19) {
-    tmp <- data.frame(team = filt, 
-                      opponent = teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
-                      result = "win", prop = NA, n = 0)
-    df <- merge(df, tmp, all = TRUE)
+    tmp <- data.frame(team=filt, 
+                      opponent=teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
+                      result="win", prop=NA, n=0)
+    df <- merge(df, tmp, all=TRUE)
   }
   
-  df <- mutate(df, opponent = factor(opponent, levels = opponent[order(-prop, na.last = TRUE)]))
+  df <- mutate(df, opponent=factor(opponent, levels=opponent[order(-prop, na.last=TRUE)]))
   
-  g <- ggplot(df, aes(x = opponent, y = prop, fill = result)) + 
-    geom_bar(stat = "identity", width = 0.75, fill = teams$color[i], alpha = 0.75) + 
-    geom_text(aes(label = paste0("n=", n, " ")), angle = 90, hjust = 1, size = 3, color = "white") + 
-    scale_y_continuous(labels = percent) + guides(fill = FALSE) + 
-    theme_graphzoo(base_size = 12) + 
-    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
+  g <- ggplot(df, aes(x=opponent, y=prop, fill=result)) + 
+    geom_bar(stat="identity", width=0.75, fill=teams$color[i], alpha=0.75) + 
+    geom_text(aes(label=paste0("n=", n, " ")), angle=90, hjust=1, size=3, color="white") + 
+    scale_y_continuous(labels=percent) + guides(fill=FALSE) + 
+    theme_graphzoo(base_size=12) + 
+    theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1))
   
   img <- readPNG(paste0("../img/", teams$logo[i], ".png"))
   img <- rasterGrob(img, interpolate=TRUE)
 
-  g <- g + annotation_custom(img, xmin = 16, xmax = Inf, ymax = Inf,
-                             ymin = max(0.75 * df$prop, na.rm = TRUE))
+  g <- g + annotation_custom(img, xmin=16, xmax=Inf, ymax=Inf,
+                             ymin=max(0.75 * df$prop, na.rm=TRUE))
 
-  gz_graph(g, title = paste0("Winning percentage of ", filt, " against..."), 
-           subtitle = "From 1888 to 2014 - 2015 English Premier League teams only",
-           banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
-           cex.title = 1.25, cex.banner = 0.7)
+  gz_graph(g, title=paste0("Winning percentage of ", filt, " against..."), 
+           subtitle="From 1888 to 2014 - 2015 English Premier League teams only",
+           banner.l="GRAPHZOO.TUMBLR.COM", banner.r="SOURCE: JAMES CURLEY",
+           cex.title=1.25, cex.banner=0.7)
   
   grid.newpage()
 }
@@ -110,21 +110,21 @@ for (i in 1:nrow(teams)) {
 
 ```{r, 'figure_1b', cache=FALSE, warning=FALSE, dpi=300}
 df <- filter(stats, result == "win") %>%
-  mutate(team = factor(team, levels = teams$team),
-         opponent = factor(opponent, levels = rev(teams$team)))
+  mutate(team=factor(team, levels=teams$team),
+         opponent=factor(opponent, levels=rev(teams$team)))
 
-g <- ggplot(df, aes(x = team, y = opponent, fill = prop)) +
-  geom_tile(height = 0.75) +
-  scale_fill_viridis(name = "", limits = c(0, NA), na.value = "#F0F0F0", labels = percent) + 
-  theme_graphzoo(base_size = 12) + 
-  theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(),
-        legend.key.height = unit(0.5, "inches"))
+g <- ggplot(df, aes(x=team, y=opponent, fill=prop)) +
+  geom_tile(height=0.75) +
+  scale_fill_viridis(name="", limits=c(0, NA), na.value="#F0F0F0", labels=percent) + 
+  theme_graphzoo(base_size=12) + 
+  theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1),
+        panel.grid.major.y=element_blank(), panel.grid.minor.y=element_blank(),
+        legend.key.height=unit(0.5, "inches"))
 
-gz_graph(g, title = "Winning percentage of ... against ...", 
-         subtitle = "From 1888 to 2014 - 2015 English Premier League teams only",
-         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
-         cex.title = 1.25, cex.banner = 0.7)
+gz_graph(g, title="Winning percentage of ... against ...", 
+         subtitle="From 1888 to 2014 - 2015 English Premier League teams only",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="SOURCE: JAMES CURLEY",
+         cex.title=1.25, cex.banner=0.7)
 ```
 <p class="caption">**Figure 1b:** Figure caption.</p>
 
@@ -140,31 +140,31 @@ for (i in 1:nrow(teams)) {
   df <- filter(stats, team == filt, result == "loss") 
   
   if (nrow(df) < 19) {
-    tmp <- data.frame(team = filt, 
-                      opponent = teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
-                      result = "loss", prop = NA, n = 0)
-    df <- merge(df, tmp, all = TRUE)
+    tmp <- data.frame(team=filt, 
+                      opponent=teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
+                      result="loss", prop=NA, n=0)
+    df <- merge(df, tmp, all=TRUE)
   }
   
-  df <- mutate(df, opponent = factor(opponent, levels = opponent[order(-prop, na.last = TRUE)]))
+  df <- mutate(df, opponent=factor(opponent, levels=opponent[order(-prop, na.last=TRUE)]))
   
-  g <- ggplot(df, aes(x = opponent, y = prop, fill = result)) + 
-    geom_bar(stat = "identity", width = 0.75, fill = teams$color[i], alpha = 0.75) + 
-    geom_text(aes(label = paste0("n=", n, " ")), angle = 90, hjust = 1, size = 3, color = "white") + 
-    scale_y_continuous(labels = percent) + guides(fill = FALSE) + 
-    theme_graphzoo(base_size = 12) + 
-    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
+  g <- ggplot(df, aes(x=opponent, y=prop, fill=result)) + 
+    geom_bar(stat="identity", width=0.75, fill=teams$color[i], alpha=0.75) + 
+    geom_text(aes(label=paste0("n=", n, " ")), angle=90, hjust=1, size=3, color="white") + 
+    scale_y_continuous(labels=percent) + guides(fill=FALSE) + 
+    theme_graphzoo(base_size=12) + 
+    theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1))
   
   img <- readPNG(paste0("../img/", teams$logo[i], ".png"))
   img <- rasterGrob(img, interpolate=TRUE)
 
-  g <- g + annotation_custom(img, xmin = 16, xmax = Inf, ymax = Inf,
-                             ymin = max(0.75 * df$prop, na.rm = TRUE))
+  g <- g + annotation_custom(img, xmin=16, xmax=Inf, ymax=Inf,
+                             ymin=max(0.75 * df$prop, na.rm=TRUE))
 
-  gz_graph(g, title = paste0("Losing percentage of ", filt, " against..."), 
-           subtitle = "From 1888 to 2014 - 2015 English Premier League teams only",
-           banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
-           cex.title = 1.25, cex.banner = 0.7)
+  gz_graph(g, title=paste0("Losing percentage of ", filt, " against..."), 
+           subtitle="From 1888 to 2014 - 2015 English Premier League teams only",
+           banner.l="GRAPHZOO.TUMBLR.COM", banner.r="SOURCE: JAMES CURLEY",
+           cex.title=1.25, cex.banner=0.7)
   
   grid.newpage()
 }
@@ -173,21 +173,21 @@ for (i in 1:nrow(teams)) {
 
 ```{r, 'figure_2b', cache=FALSE, warning=FALSE, dpi=300}
 df <- filter(stats, result == "loss") %>%
-  mutate(team = factor(team, levels = teams$team),
-         opponent = factor(opponent, levels = rev(teams$team)))
+  mutate(team=factor(team, levels=teams$team),
+         opponent=factor(opponent, levels=rev(teams$team)))
 
-g <- ggplot(df, aes(x = team, y = opponent, fill = prop)) +
-  geom_tile(height = 0.75) +
-  scale_fill_viridis(name = "", limits = c(0, NA), na.value = "#F0F0F0", labels = percent) + 
-  theme_graphzoo(base_size = 12) + 
-  theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(),
-        legend.key.height = unit(0.5, "inches"))
+g <- ggplot(df, aes(x=team, y=opponent, fill=prop)) +
+  geom_tile(height=0.75) +
+  scale_fill_viridis(name="", limits=c(0, NA), na.value="#F0F0F0", labels=percent) + 
+  theme_graphzoo(base_size=12) + 
+  theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1),
+        panel.grid.major.y=element_blank(), panel.grid.minor.y=element_blank(),
+        legend.key.height=unit(0.5, "inches"))
 
-gz_graph(g, title = "Losing percentage of ... against ...", 
-         subtitle = "From 1888 to 2014 - 2015 English Premier League teams only",
-         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
-         cex.title = 1.25, cex.banner = 0.7)
+gz_graph(g, title="Losing percentage of ... against ...", 
+         subtitle="From 1888 to 2014 - 2015 English Premier League teams only",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="SOURCE: JAMES CURLEY",
+         cex.title=1.25, cex.banner=0.7)
 ```
 <p class="caption">**Figure 2b:** Figure caption.</p>
 
@@ -203,44 +203,73 @@ for (i in 1:nrow(teams)) {
   df <- filter(stats, team == filt) 
   
   if (nrow(df) < 3 * 19) {
-    tmp <- data.frame(team = filt, 
-                      opponent = teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
-                      result = rep(c("win", "loss", "draw"), (3 * 19 - nrow(df)) / 3), prop = NA, n = 0)
-    df <- merge(df, tmp, all = TRUE)
+    tmp <- data.frame(team=filt, 
+                      opponent=teams$team[!(teams$team %in% df$opponent) & teams$team != filt], 
+                      result=rep(c("win", "loss", "draw"), (3 * 19 - nrow(df)) / 3), prop=NA, n=0)
+    df <- merge(df, tmp, all=TRUE)
   }
   
   ordr <- filter(df, result == "win")
-  ordr <- ordr$opponent[order(-ordr$prop, na.last = TRUE)]
-  df <- mutate(df, opponent = factor(opponent, levels = ordr),
-               result = factor(result, levels = c("win", "draw", "loss")),
-               order = ifelse(result == "win", 1, ifelse(result == "draw", 2, 3)),
-               n.color = ifelse(n > 0, "white", "black"))
+  ordr <- ordr$opponent[order(-ordr$prop, na.last=TRUE)]
+  df <- mutate(df, opponent=factor(opponent, levels=ordr),
+               result=factor(result, levels=c("win", "draw", "loss")),
+               order=ifelse(result == "win", 1, ifelse(result == "draw", 2, 3)),
+               n.color=ifelse(n > 0, "white", "black"))
   
-  g <- ggplot(df, aes(x = opponent, y = prop, alpha = result, order = order)) + 
-    geom_bar(stat = "identity", width = 0.75, fill = teams$color[i]) + 
-    geom_text(aes(label = paste0(" n=", n), color = n.color), y = 0, angle = 90, 
-              hjust = 0, size = 3, show_guide = FALSE) + 
-    scale_color_manual(values = c("white" = "white", "black" = "black")) +
-    scale_y_continuous(labels = percent) + 
-    scale_alpha_manual("", values = c(0.75, 0.5, 0.25), label = c("win", "tie", "loss")) +
-    theme_graphzoo(base_size = 12) + guides(shape = FALSE) + 
-    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
+  g <- ggplot(df, aes(x=opponent, y=prop, alpha=result, order=order)) + 
+    geom_bar(stat="identity", width=0.75, fill=teams$color[i]) + 
+    geom_text(aes(label=paste0(" n=", n), color=n.color), y=0, angle=90, 
+              hjust=0, size=3, show_guide=FALSE) + 
+    scale_color_manual(values=c("white"="white", "black"="black")) +
+    scale_y_continuous(labels=percent) + 
+    scale_alpha_manual("", values=c(0.75, 0.5, 0.25), label=c("win", "tie", "loss")) +
+    theme_graphzoo(base_size=12) + guides(shape=FALSE) + 
+    theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1))
 
-  gz_graph(g, title = paste0("Win-Tie-Loss percentages for ", filt), 
-           subtitle = "From 1888 to 2014 - 2015 English Premier League teams only",
-           banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "SOURCE: JAMES CURLEY",
-           cex.title = 1.2, cex.banner = 0.7)
+  gz_graph(g, title=paste0("Win-Tie-Loss percentages for ", filt), 
+           subtitle="From 1888 to 2014 - 2015 English Premier League teams only",
+           banner.l="GRAPHZOO.TUMBLR.COM", banner.r="SOURCE: JAMES CURLEY",
+           cex.title=1.2, cex.banner=0.7)
   
   img <- readPNG(paste0("../img/", teams$logo[i], ".png"))
-  grid.raster(img, x = unit(0.98, "npc"), y = unit(0.98, "npc"), 
-              height = unit(0.15, "npc"),
-              hjust = 1, vjust = 1)
+  grid.raster(img, x=unit(0.98, "npc"), y=unit(0.98, "npc"), 
+              height=unit(0.15, "npc"),
+              hjust=1, vjust=1)
 
   grid.newpage()
 }
 ```
 <p class="caption">**Figure 3:** Figure caption.</p>
 
+[Back to top]("#")
+
+---
+
+# Compute season statistics
+
+```{r, 'statistics2', cache=TRUE}
+tmp <- lapply(teams$team, 
+              function(team, df) {
+                filt <- filter(df, home == team | visitor == team) %>%
+                  mutate(goalFor=ifelse(home == team, hgoal, vgoal),
+                         goalAgainst=ifelse(home == team, vgoal, hgoal)) 
+                data.frame(team=team, season=filt$Season, division=filt$division, 
+                           goalFor=filt$goalFor, goalAgainst=filt$goalAgainst)
+              }, df=engsoccerdata2)
+
+stats2 <- Reduce(function(...) merge(..., all=T), tmp) %>%
+  group_by(team, season) %>%
+  summarize(division = division[1], goalFor = mean(goalFor), goalAgainst = mean(goalAgainst))
+  
+
+ggplot(filter(stats2, team %in% c("Arsenal", "Chelsea", "Liverpool"), season >= 2000), 
+              aes(x = season, y = goalAgainst, color = team)) +
+  geom_point() + geom_path()
 
 
+```
+
+[Back to top]("#")
+
+---
 

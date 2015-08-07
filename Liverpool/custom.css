@@ -1,0 +1,66 @@
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  font-size: 18px;
+  text-indent: 2em;
+}
+
+.title {
+  font-weight: bold;
+}
+
+.subtitle {
+  margin-top: 0.1em;
+  font-size: 24px;
+}
+
+.author {
+  margin-top: 1em;
+}
+
+p {
+  text-align: justify;
+  font-size: 1.1em;
+}
+
+.header-section-number::after, 
+.toc-section-number::after {
+  content: " - ";
+}
+
+hr {
+  border: none;
+  height: 3px;
+  color: #EEEEEE; 
+  background-color: #EEEEEE; 
+}
+
+.caption {
+  text-align: justify;
+  padding-left: 10%;
+  padding-right: 10%;
+  padding-top: 6pt;
+  padding-bottom: 6pt;
+}
+
+pre {
+  width: 80%;
+  margin-left: 10%;
+  margin-right: 10%;
+}
+
+video {
+  width: 80%;
+  margin-left: 10%;
+  margin-right: 10%;
+}
+
+img {
+  width: 80%;
+  margin-left: 10%;
+  margin-right: 10%;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}

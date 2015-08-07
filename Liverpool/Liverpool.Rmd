@@ -1,0 +1,225 @@
+---
+title: "Liverpool is still the most successful team in Premier League history"
+subtitle: "but for how long?"
+author: "Simon Garnier"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    css: custom.css
+    fig_caption: true
+    fig_width: 8
+    fig_height: 6
+    number_sections: true
+    theme: cosmo
+    toc: true
+    csl: plos.csl
+    bibliography: library.bib
+---
+
+--- 
+
+```{r, 'setup', message=FALSE, echo=FALSE}
+library(engsoccerdata)
+library(dplyr)
+library(ggplot2)
+library(scales)
+library(forecast)
+library(graphZoo)
+library(RColorBrewer)
+
+cbf <- brewer.pal(8, "Dark2")
+```
+
+I guess I should start with a disclaimer: I am an [Arsenal F.C.](http://www.arsenal.com) supporter. Not a hardcore fan, but still, when it comes to English football, my preference goes to the Gunners, probably because they are the 'Frenchest' team of the [Premier League](http://www.premierleague.com) - other disclaimer: I am French. 
+
+Nonetheless, as a football aficionado, I can not help but recognize that [Liverpool F.C.](http://www.liverpoolfc.com/) played and still plays an important part in English football history. After all, they are still the most successful team in English  football, with more wins than any other team that has played or is currently playing in the highest division. 
+
+```{r, 'winTop20', dpi=300, echo=FALSE}
+wins <- filter(engsoccerdata2, result != "D", division == 1) %>%
+  mutate(victor=ifelse(result == "H", home, visitor)) %>%
+  group_by(victor) %>%
+  summarize(count=length(victor)) %>%
+  arrange(desc(count))
+
+g <- ggplot(wins[1:20,], aes(x=reorder(factor(victor), count), y=count, alpha=count)) +
+  geom_bar(stat="identity", fill=cbf[2], width=0.925) + 
+  coord_flip() + guides(alpha=FALSE) +
+  theme_graphzoo(base_size=14) + theme(axis.title=element_blank())
+
+gz_graph(g, title="Total number of victories (top 20)", subtitle="English top-flight football (from 1888 to 2014)",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="DATA: JAMES CURLEY",
+         cex.title=1.5, cex.banner=0.7)
+```
+
+Now, the question for all Liverpool fans is: will it last, and for how long? Liverpool has not won a top-flight championship since 1990, and in the meantime a number of teams has started catching up with the Red Devils, both in the number of titles won ([Manchester United](http://www.manutd.com) is actually ahead of Liverpool since 2011) and in the total number of wins. 
+
+**How much more time before Liverpool fans are forced to stop looking down on the rest of us?**
+
+First, we can take a look at the cumulative number of top-flight football matches won by Liverpool, and compare it to the cumulative number of wins of the next four most successful teams in English football: Arsenal, [Everton](http://www.evertonfc.com), Manchester United, and [Aston Villa](http://www.avfc.co.uk/). 
+
+```{r, cumulWinBig5, dpi=300, echo=FALSE}
+cumWins <- filter(engsoccerdata2, result != "D", division == 1) %>%
+  mutate(victor=ifelse(result == "H", home, visitor)) %>%
+  mutate(win=1) %>%
+  group_by(victor, Season) %>%
+  summarize(win=sum(win)) %>%
+  group_by(victor) %>%
+  mutate(cum.win=order_by(Season, cumsum(win))) %>%
+  filter(victor %in% c("Liverpool", "Arsenal", "Everton", "Manchester United", "Aston Villa")) %>%
+  mutate(Date=as.Date(paste0("07/02/", Season + 1), format="%m/%d/%Y"))
+
+teams <- group_by(cumWins, victor) %>%
+  summarize(sum=max(cum.win)) %>%
+  mutate(colors=c("#D80A19", "#79053C50", "#29468650", "#CE0A2D", "#D80B1D"))
+
+g <- ggplot(filter(cumWins, Season >= 1985), aes(x=as.Date(Date), y=cum.win, color=victor)) +
+  geom_line(size=1) + 
+  scale_x_date(limits=c(min(as.Date("1985-01-01")), as.Date("2022-01-01"))) + 
+  annotate("text", x=as.Date("2016-01-01"), y=teams$sum + c(5, 0, 0, 0, 0), alpha=c(1, .5, .5, 1, 1), 
+           label=teams$victor, hjust=0, size=3.5, 
+           fontface=c("bold", "plain", "plain", "bold", "bold"), family="Open Sans") + 
+  scale_color_manual(values=teams$colors) + guides(color=FALSE) + 
+  theme_graphzoo(base_size=16) + theme(axis.title=element_blank())
+
+gz_graph(g, title="Cumulative number of wins", subtitle="English top-flight football (since 1888)",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="DATA: JAMES CURLEY",
+         cex.title=1.5, cex.banner=0.7)
+```
+
+Clearly, both Everton and Aston Villa are in free fall since the mid-1980's. Liverpool caught up with Aston Villa around 1986, and with Everton in the early 2000's. Arsenal did the same around the late 1990's and early 2010's respectively. Manchester United passed Aston Villa in 2009, but has yet to catch up with Everton. At this point, we can safely say that both Everton and Aston Villa are very unlikely to catch up with Liverpool, even in a distant future, and that we can ignore them for the rest of this analysis. 
+
+However, it is a different story for Arsenal and Manchester United. While Liverpool still holds a comfortable lead on both teams - +`r max(filter(cumWins, victor == "Liverpool")$cum.win) - max(filter(cumWins, victor == "Arsenal")$cum.win)` wins and +`r max(filter(cumWins, victor == "Liverpool")$cum.win) - max(filter(cumWins, victor == "Manchester United")$cum.win)` wins, respectively -, the gap between Liverpool and its two closest rivals is slowly but surely shrinking. Assuming that the current trend holds, can we predict when Arsenal and Manchester United will finally catch up with Liverpool? 
+
+In order to do so, I will use a statistical modeling technique called AutoRegressive Integrated Moving Average - ARIMA for short. It is used frequently to analyze [time series](https://en.wikipedia.org/wiki/Time_series), that is temporal variations of a measurement. Things like annual variations of the GDP or daily temperature changes are example of time series. More importantly for us, ARIMA can be used to predict future values of time series. I will not explain the how and the why, but you can learn more about ARIMAs by visiting this [Wikipedia page](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average). 
+
+For this quick analysis, I have used all the match results for Liverpool, Arsenal and Manchester United in the highest English football division since 1975. I have chosen this particular cutoff date because the three teams have never left the highest level of English football since then (Manchester United briefly visited the Division 2 during the 1974-75 season). The results of the ARIMA predictions over the next 30 years are presented in the following figure. 
+
+```{r, 'forecast', dpi=300, echo=FALSE}
+tmp <- filter(cumWins, victor == "Liverpool", Season >= 1975)
+tsLiverpool <- ts(data=tmp$cum.win)
+fcstLiverpool <- forecast(auto.arima(tsLiverpool), h=30)
+
+tmp <- filter(cumWins, victor == "Arsenal", Season >= 1975)
+tsArsenal <- ts(data=tmp$cum.win)
+fcstArsenal <- forecast(auto.arima(tsArsenal), h=30)
+
+tmp <- filter(cumWins, victor == "Manchester United", Season >= 1975)
+tsManU <- ts(data=tmp$cum.win)
+fcstManU <- forecast(auto.arima(tsManU), h=30)
+
+fcst <- data.frame(victor=rep(c("Liverpool", "Arsenal", "Manchester United"), each=31),
+                   Season=2014:(2014 + 30),
+                   cum.win=c(c(tail(tsLiverpool, 1), fcstLiverpool$mean), 
+                             c(tail(tsArsenal, 1), fcstArsenal$mean), 
+                             c(tail(tsManU, 1), fcstManU$mean)),
+                   lower=c(c(tail(tsLiverpool, 1), fcstLiverpool$lower[,2]), 
+                           c(tail(tsArsenal, 1), fcstArsenal$lower[,2]), 
+                           c(tail(tsManU, 1), fcstManU$lower[,2])),
+                   upper=c(c(tail(tsLiverpool, 1), fcstLiverpool$upper[,2]), 
+                           c(tail(tsArsenal, 1), fcstArsenal$upper[,2]), 
+                           c(tail(tsManU, 1), fcstManU$upper[,2]))) %>%
+  mutate(Date=as.Date(paste0("07/02/", Season + 1), format="%m/%d/%Y"))
+
+teams <- group_by(fcst, victor) %>%
+  summarize(sum=max(cum.win)) %>%
+  mutate(colors=c("#D80A19", "#CE0A2D", "#D80B1D"))
+
+g <- ggplot(NULL, aes(x=as.Date(Date), y=cum.win, color=victor)) +
+  geom_line(data=filter(cumWins, victor %in% c("Liverpool", "Arsenal", "Manchester United"), Season >= 2005), 
+            size=1, linetype=3) +
+  geom_line(data=fcst, size=1) +
+  geom_vline(xintercept=as.numeric(as.Date("2015-08-08")), size=1, color="#666666") +
+  scale_x_date(limits=c(min(as.Date("2005-01-01")), as.Date("2054-01-01"))) + 
+  annotate("text", x=as.Date("2046-01-01"), y=teams$sum + c(0, 5, 0), 
+           label=teams$victor, hjust=0, size=3.5, fontface=c("bold", "bold", "bold"), family="Open Sans") + 
+  annotate("text", x=as.Date("2015-08-08"), y=1875, label="Beginning of the 2015-16 season",
+           size=3.5, angle=90, hjust=0, vjust=-0.75, family="Open Sans") +
+  scale_color_manual(values=teams$colors) + guides(color=FALSE) + 
+  theme_graphzoo(base_size=16) + theme(axis.title=element_blank())
+
+gz_graph(g, title="Cumulative number of wins (predictions)", subtitle="English top-flight football (since 1888)",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="DATA: JAMES CURLEY",
+         cex.title=1.5, cex.banner=0.7)
+
+```
+
+As you can see, if the three teams maintain their current winning pace, it will be at least 15 years until Arsenal overtake Liverpool. Nevertheless, Liverpool should maintain its superiority over Manchester United for at least the next 30 years. 
+
+We should remain cautious when interpreting these results. The confidence intervals of the predictions (not shown in the figure above) increase very quickly after the first few years. I would not stake my house on Arsenal overtaking Liverpool exactly when predicted by the model - and anyway, I rent an apartment. 
+
+Football is a difficult beast to predict. A few changes - like the arrival of a billionaire investor or the departure of a talented coach or manager - can change very quickly the fate of any team. Look for instance at the graph below showing the win percentages of Manchester United over the last 40 years. Can you see a pattern? I will help you: [Sir Alex Ferguson](https://en.wikipedia.org/wiki/Alex_Ferguson) might be the best manager ever in English football history. 
+
+```{r, 'winPropManU', dpi=300, echo=FALSE}
+ManU <- filter(engsoccerdata2, home == "Manchester United" | visitor == "Manchester United") %>%
+  mutate(opponent=ifelse(home == "Manchester United", visitor, home)) %>%
+  mutate(result=ifelse(result == "D", "draw", result)) %>%
+  mutate(result=ifelse(home == "Manchester United" & result == "H", "win", result)) %>%
+  mutate(result=ifelse(home == "Manchester United" & result == "A", "loss", result)) %>%
+  mutate(result=ifelse(visitor == "Manchester United" & result == "A", "win", result)) %>%
+  mutate(result=ifelse(visitor == "Manchester United" & result == "H", "loss", result))
+
+stats <- group_by(ManU, Season) %>%
+  summarize(probWin=sum(result == "win") / length(result))
+
+g <- ggplot(filter(stats, Season >= 1975), aes(x=Season, y=probWin)) +
+  geom_rect(aes(xmin=1986.5, xmax=2012.5, ymin=0, ymax=Inf), fill="#66666605") + 
+  geom_bar(stat="identity", width=1, fill="#D80B1D", alpha=0.75) +
+  annotate("text", x=1999.5, y=.81, label="Ferguson era", vjust=0, family="Open Sans") +
+  scale_y_continuous(labels=percent, limits=c(0, .85)) +
+  theme_graphzoo(base_size=12) + 
+  theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1))
+
+gz_graph(g, title="Win percentage - Manchester United", subtitle="English top-flight football",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="DATA: JAMES CURLEY",
+         cex.title=1.5, cex.banner=0.7)
+```
+
+And what about this graph of the win percentages of [Chelsea](https://www.chelseafc.com/) over the last 25 years? Can you see the difference that a sudden cash flow makes to a - until then - rather average team?
+
+```{r, 'winPropChelsea', dpi=300, echo=FALSE}
+Chelsea <- filter(engsoccerdata2, home == "Chelsea" | visitor == "Chelsea") %>%
+  mutate(opponent=ifelse(home == "Chelsea", visitor, home)) %>%
+  mutate(result=ifelse(result == "D", "draw", result)) %>%
+  mutate(result=ifelse(home == "Chelsea" & result == "H", "win", result)) %>%
+  mutate(result=ifelse(home == "Chelsea" & result == "A", "loss", result)) %>%
+  mutate(result=ifelse(visitor == "Chelsea" & result == "A", "win", result)) %>%
+  mutate(result=ifelse(visitor == "Chelsea" & result == "H", "loss", result))
+
+stats <- group_by(Chelsea, Season) %>%
+  summarize(probWin=sum(result == "win") / length(result))
+
+g <- ggplot(filter(stats, Season >= 1990), aes(x=Season, y=probWin)) +
+  geom_rect(aes(xmin=2002.5, xmax=2014.5, ymin=0, ymax=Inf), fill="#66666605") + 
+  geom_bar(stat="identity", width=1, fill="#0B4892", alpha=0.75) +
+  annotate("text", x=2008.5, y=.81, label="Abramovich era", vjust=0, family="Open Sans") +
+  scale_y_continuous(labels=percent, limits=c(0, .85)) +
+  theme_graphzoo(base_size=12) + 
+  theme(axis.title=element_blank(), axis.text.x=element_text(angle=45, hjust=1))
+
+gz_graph(g, title="Win percentage - Chelsea", subtitle="English top-flight football",
+         banner.l="GRAPHZOO.TUMBLR.COM", banner.r="DATA: JAMES CURLEY",
+         cex.title=1.5, cex.banner=0.7)
+```
+
+As illustrated by these two examples, things can change very quickly in football. Today's predictions might turn out completely wrong, but this uncertainty is what makes football so thrilling. Your team might be terrible today, but it can rise suddenly over a few seasons; or it might seem invicible one year and yet quickly crumble the next. 
+
+All we can do now is wait for fifteen years to verify if today's prediction were correct. And if they are not - which is more likely -, then it will mean that we have had fifteen exciting years of football!
+
+---
+
+<small>All the data used in this post where provided by the 'engsoccerdata' package for R, developed by [James Curley](http://curleylab.psych.columbia.edu/curley.html). This package can be found on Github at the following address: [https://github.com/jalapic/engsoccerdata](https://github.com/jalapic/engsoccerdata).
+    
+The source code for reproducing the figures in this post is available on Github at: [https://github.com/sjmgarnier/soccer_stats/tree/master/Liverpool](https://github.com/sjmgarnier/soccer_stats/tree/master/Liverpool)</small>
+
+
+
+
+
+
+
+
+
+
+
+
+
