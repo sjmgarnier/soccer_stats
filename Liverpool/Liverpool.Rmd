@@ -12,8 +12,6 @@ output:
     number_sections: true
     theme: cosmo
     toc: true
-    csl: plos.csl
-    bibliography: library.bib
 ---
 
 --- 

@@ -1,0 +1,166 @@
+---
+title: "Is the English Premier League too predictable?"
+author: "Simon Garnier"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    css: custom.css
+    fig_caption: true
+    fig_width: 8
+    fig_height: 6
+    number_sections: true
+    theme: cosmo
+    toc: true
+---
+
+--- 
+
+```{r, 'setup', message=FALSE, echo=FALSE}
+library(engsoccerdata)
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(graphZoo)
+library(RColorBrewer)
+
+doProp <- function(x) {
+  tab <- table(x)
+  data.frame(result = names(tab), prop = as.vector(tab / sum(tab)), n = sum(tab))
+}
+
+cbf <- brewer.pal(8, "Dark2")
+```
+
+[In one of its latest podcasts](http://freakonomics.com/2015/07/29/how-to-create-suspense-a-new-freakonomics-radio-episode/), Freakonomics' [Stephen Dubner](http://www.stephenjdubner.com/index.html) explores the concept of suspense with three economists: [Jeffrey Ely](http://jeffely.com/), [Alexander Frankel](http://faculty.chicagobooth.edu/alexander.frankel/), and [Emir Kamenica](http://faculty.chicagobooth.edu/emir.kamenica/). At some point during the show, they try to answer the question of what makes a particular sport suspenseful. They immediately refer to football as a particularly suspenseful sport, not because a lot goes on during a game, but because at any moment something important, even dramatic could happen (see the [full transcript](http://freakonomics.com/2015/07/29/how-to-create-suspense-full-transcript/) for more on this). Leaving your couch to grab a beer from the fridge for instance is taking the risk of missing the only goal of the game. Even during the final moments of the most boring match, you do not want to remove your eyes from the screen in case this final run, or this final pass leads to a last second victory. 
+
+A full season of football, however, does rarely maintain suspense until its end. Often it has very little suspense at all, even from the start. For instance, most people would agree that only four, maybe five of the teams in this year's English Premier League (EPL) have a real chance at finishing first. And this is not a particularity of the 2015/16 season. Over the last twenty seasons, 44 different teams have played in the EPL, but four teams only won the division title during this period: [Arsenal](http://www.arsenal.com/) (3 titles), [Chelsea](https://www.chelseafc.com/) (4 titles), [Manchester City](http://www.mcfc.com/) (2 titles), and [Manchester United](http://www.manutd.com/) (11 titles!). Quite frustrating if you are a fan of another team!
+
+**But is the English Premier League really that predictable? And if yes, was it always the case?**
+
+In order to answer this question, I need to determine the volatility of the EPL, that is the degree of variation of each team's performance from one season to the next. In order to measure a team's performance over a given season, I will compute its [winning percentage](https://en.wikipedia.org/wiki/Winning_percentage), that is the fraction of matches this team has won over that particular season. It is calculated as the number of wins divided by the total number of matches, with tied matches counting for $\frac{1}{2}$ win. 
+
+```{r, 'winPercStats', cache=TRUE, echo=FALSE}
+teams <- filter(engsoccerdata2, division == 1) %>%
+  group_by(home) %>% summarize() %>% rename(name = home) 
+
+tmp <- lapply(teams$name, 
+              function(team, df) {
+                filt <- filter(df, home == team | visitor == team) %>%
+                  mutate(season = Season) %>%
+                  mutate(result = ifelse(result == "D", "draw", result)) %>%
+                  mutate(result = ifelse(home == team & result == "H", "win", result)) %>%
+                  mutate(result = ifelse(home == team & result == "A", "loss", result)) %>%
+                  mutate(result = ifelse(visitor == team & result == "A", "win", result)) %>%
+                  mutate(result = ifelse(visitor == team & result == "H", "loss", result))
+                data.frame(team = team, season = filt$season, result = filt$result)
+              }, df = engsoccerdata2)
+
+stats <- Reduce(function(...) merge(..., all = TRUE), tmp) %>%
+  group_by(team, season) %>% 
+  do(doProp(.$result)) %>%
+  mutate(result = factor(result, levels = c("win", "draw", "loss"))) %>%
+  ungroup()
+
+winPerc <- group_by(stats, team, season) %>%
+  summarize(win = prop[result == "win"] + 0.5 * prop[result == "draw"],
+            loss = prop[result == "loss"] + 0.5 * prop[result == "draw"])
+```
+
+For instance, the figure below shows the evolution of the winning percentages of Arsenal and [Aston Villa](http://www.avfc.co.uk/) over the last twenty seasons. As you can see, Arsenal has maintained a fairly high level of performance throughout this period, while Aston Villa has slowly but surely sunk toward the bottom of the league. 
+
+```{r, 'winPercPlot', echo=FALSE, warning=FALSE, message=FALSE, dpi=300}
+g <- ggplot(filter(winPerc, season > 1994, team %in% c("Arsenal", "Aston Villa")), 
+            aes(x = season, y = win, color = team)) + 
+  geom_line(size = 1, alpha = 0.25, linetype = 3) + geom_point(size = 3) + 
+  geom_smooth(method = "lm", se = FALSE, size = 1) + 
+  annotate("text", x = 2012, y = c(0.75, 0.45), label = c("Arsenal", "Aston Villa"),
+           hjust = 0, vjust = 0, size = 4, fontface = "bold", family = "Open Sans", 
+           color = c("#D80A19", "#79053C")) +
+  scale_color_manual(values = c("#D80A19", "#79053C")) + guides(color = FALSE) +
+  theme_graphzoo(base_size = 16) + theme(axis.title = element_blank())
+
+gz_graph(g, title = "Winning percentages of Arsenal and Aston Villa", 
+         subtitle = "English top-flight football (since 1995)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "DATA: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+```
+
+The volatility of each team's performance is then simply calculated as the absolute difference of performance from one season to the next. For instance, between the 2013/14 and 2014/15 seasons, Arsenal winning percentage went from `r round(100 * filter(winPerc, team == "Arsenal", season == 2013)$win, 2)`% to `r round(100 * filter(winPerc, team == "Arsenal", season == 2014)$win, 2)`%. The absolute difference between these two seasons is therefore of `r round(abs(diff(100 * filter(winPerc, team == "Arsenal", season %in% 2013:2014)$win)), 2)`%. This is a rather small difference, indicating that the team's performance has remained stable between the two seasons. On the contrary, a large absolute difference would have meant that the team's performance one season was considerably better - or worse - than the team's performance in the previous season. 
+
+```{r, 'volatilityStats', echo=FALSE, cache=TRUE}
+volatility <- group_by(winPerc, team) %>%
+  do(data.table(season = c(.$season, seq(1888, 2014)[!(seq(1888, 2014) %in% .$season)]),
+                win = c(.$win, rep(NA, 127 - length(.$win))),
+                loss = c(.$loss, rep(NA, 127 - length(.$loss))))) %>%
+  arrange(season) %>% 
+  mutate(distance = c(NA, abs(diff(win)))) 
+
+volatilityAvg <- group_by(volatility, season) %>%
+  summarize(distance = mean(distance, na.rm = TRUE))
+```
+
+The final step of the process is simply to compute the average volatility of the league for each season. A low average volatility for a given season would indicate that the performances of all the teams during that season are in average close to their performances the season before. In other words, it means that the previous season is a good predictor of the current one. On the contrary, a higher average volatility would show a higher level of unpredictability between two successive seasons. 
+
+The following figure shows how the league's volatility changed over time, since the creation of the English championship in 1888. 
+
+```{r, 'volatilityPlot', echo=FALSE, warning=FALSE, message=FALSE, dpi=300}
+g <- ggplot(NULL, aes(x = season, y = distance)) + 
+  geom_point(data = filter(volatilityAvg, season != 1939)) + 
+  geom_smooth(data = filter(volatility, season != 1939), se = FALSE, size = 1, color = cbf[2]) + 
+  theme_graphzoo(base_size = 16) + theme(axis.title = element_blank())
+
+gz_graph(g, title = "Average winning percentage volatility", 
+         subtitle = "English top-flight football (since 1888)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "DATA: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+```
+
+As can be expected, the English championship was the most unpredictable in the years after its creation. All the teams were new to professionalism and it is likely that a lot of experimentation took place during those years. Moreover the number of games at the time was much lower than today (12 teams only), giving more influence to each game on the value of the winning percentage. However this would have only mattered until 1905 when the championship reached today's size. 
+
+After this initial period of higher volatility, the championship became progressively more predictable. It hit its most 'boring' phase just before World War II. After the war, the volatility of the championship started increasing slowly. It seems to have reached a plateau around the late 1990's. 
+
+So, **is the EPL really that predictable?** It is certainly more predictable than when the English championship was born, but today's league is not the most boring of all times. It used to be much more predictable between the two world wars, and has actually grown more exciting since then. 
+
+But what about the fact that four teams only have won the EPL in the last twenty years? Can we reconcile this fact with the results above? In order to get more insights, I reran the analysis by separating the [Big Four](https://en.wikipedia.org/wiki/Premier_League#.22Big_Four.22_dominance_.282000s.29) (Arsenal, Chelsea, Manchester City and Manchester United) from the rest of the league's team. The results since 1980 are displayed below. 
+
+```{r, 'volatilityPlotBig4', echo=FALSE, warning=FALSE, message=FALSE, dpi=300}
+volatilityAvgNotBig4 <- filter(volatility, !(team %in% c("Arsenal", "Chelsea", "Manchester City", "Manchester United"))) %>%
+  group_by(season) %>%
+  summarize(distance = mean(distance, na.rm = TRUE))
+
+volatilityAvgBig4 <- filter(volatility, team %in% c("Arsenal", "Chelsea", "Manchester City", "Manchester United")) %>%
+  group_by(season) %>%
+  summarize(distance = mean(distance, na.rm = TRUE))
+
+g <- ggplot(NULL, aes(x = season, y = distance)) + 
+  geom_point(data = filter(volatilityAvgNotBig4, season != 1939), color = cbf[2]) + 
+  geom_line(data = filter(volatilityAvgNotBig4, season != 1939), color = cbf[2], linetype = 3) + 
+  geom_smooth(data = filter(volatility, season != 1939,
+                            !(team %in% c("Arsenal", "Chelsea", "Manchester City", "Manchester United"))), 
+              se = FALSE, size = 1, color = cbf[2]) + 
+  geom_point(data = filter(volatilityAvgBig4, season != 1939), color = cbf[1]) + 
+  geom_line(data = filter(volatilityAvgBig4, season != 1939), color = cbf[1], linetype = 3) + 
+  geom_smooth(data = filter(volatility, season != 1939,
+                            team %in% c("Arsenal", "Chelsea", "Manchester City", "Manchester United")), 
+              se = FALSE, size = 1, color = cbf[1]) +
+  annotate("text", x = 2007.5, y = c(0.025, 0.14), label = c("Big Four", "Rest of the league"),
+           hjust = 0, vjust = c(0, 1), size = 4, fontface = "bold", family = "Open Sans", 
+           color = c(cbf[1], cbf[2])) +
+  coord_cartesian(xlim = c(1980, 2015)) + 
+  theme_graphzoo(base_size = 16) + theme(axis.title = element_blank())
+  
+gz_graph(g, title = "Average winning percentage volatility", 
+         subtitle = "English top-flight football (since 1888)",
+         banner.l = "GRAPHZOO.TUMBLR.COM", banner.r = "DATA: JAMES CURLEY",
+         cex.title = 1.5, cex.banner = 0.7)
+```
+
+The Big Four data is of course noisier than the rest of the league (4 vs 16 values for each average point). However it shows a rather clear trend toward lower volatility with time, that is toward more consistent performances. This is especially true for the last 10 years where the average performances of the Big Four were often twice as less volatile (that is twice as much predictable) than the average performances from the rest of the league's teams. This would explain the apparent discrepancy between a fairly volatile EPL and the consistent dominance of the Big Four teams over the last two decades. In today's EPL, suspense is almost absent from the top tier ([where most of the money is](http://www.theguardian.com/football/2015/apr/29/premier-league-finances-club-by-club)) and the Big Four teams are safe bets for this season's title winner, and probably also for the next few years to come. If you want some excitement however, then you will have to look below. 
+
+
+
+
+
+
+
